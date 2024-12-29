@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Web Whiteboard</title>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background-color: #f0f0f0;
+    }
+
+    canvas {
+      border: 2px solid #333;
+      background-color: #fff;
+      cursor: crosshair;
+      touch-action: none;
+      width: 100vw;
+      height: calc(100vh - 50px); /* Adjust for controls */
+    }
+
+    .controls {
+      margin-top: 0;
+      width: 100%;
+      display: flex;
+      justify-content: space-around;
+      background-color: #333;
+      padding: 10px 0;
+    }
+
+    button {
+      flex: 1;
+      margin: 0 5px;
+      padding: 10px;
+      font-size: 16px;
+      cursor: pointer;
+      color: white;
+      background-color: #555;
+      border: none;
+      border-radius: 4px;
+    }
+
+    button:hover {
+      background-color: #777;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="whiteboard"></canvas>
+  <div class="controls">
+    <button id="undo">Undo</button>
+    <button id="redo">Redo</button>
+    <button id="erase">Erase All</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('whiteboard');
+    const ctx = canvas.getContext('2d');
+    const undoStack = [];
+    const redoStack = [];
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight - 50; // Adjust for controls height
+
+    let drawing = false;
+    let currentPath = [];
+
+    // Prevent default touch gestures like zooming
+    document.addEventListener('gesturestart', (e) => e.preventDefault());
+    document.addEventListener('gesturechange', (e) => e.preventDefault());
+    document.addEventListener('gestureend', (e) => e.preventDefault());
+
+    // Start drawing
+    canvas.addEventListener('mousedown', (e) => {
+      drawing = true;
+      currentPath = [];
+      ctx.beginPath();
+      ctx.moveTo(e.offsetX, e.offsetY);
+      currentPath.push({ x: e.offsetX, y: e.offsetY });
+    });
+
+    canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const rect = canvas.getBoundingClientRect();
+      drawing = true;
+      currentPath = [];
+      ctx.beginPath();
+      ctx.moveTo(touch.clientX - rect.left, touch.clientY - rect.top);
+      currentPath.push({ x: touch.clientX - rect.left, y: touch.clientY - rect.top });
+    });
+
+    // Draw lines
+    canvas.addEventListener('mousemove', (e) => {
+      if (!drawing) return;
+      ctx.lineTo(e.offsetX, e.offsetY);
+      ctx.stroke();
+      currentPath.push({ x: e.offsetX, y: e.offsetY });
+    });
+
+    canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      if (!drawing) return;
+      const touch = e.touches[0];
+      const rect = canvas.getBoundingClientRect();
+      ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top);
+      ctx.stroke();
+      currentPath.push({ x: touch.clientX - rect.left, y: touch.clientY - rect.top });
+    });
+
+    // Stop drawing
+    canvas.addEventListener('mouseup', () => {
+      if (drawing) {
+        undoStack.push([...currentPath]);
+        redoStack.length = 0; // Clear redo stack on new action
+      }
+      drawing = false;
+    });
+
+    canvas.addEventListener('touchend', () => {
+      if (drawing) {
+        undoStack.push([...currentPath]);
+        redoStack.length = 0; // Clear redo stack on new action
+      }
+      drawing = false;
+    });
+
+    // Undo functionality
+    document.getElementById('undo').addEventListener('click', () => {
+      if (undoStack.length === 0) return;
+      redoStack.push(undoStack.pop());
+      redrawCanvas();
+    });
+
+    // Redo functionality
+    document.getElementById('redo').addEventListener('click', () => {
+      if (redoStack.length === 0) return;
+      undoStack.push(redoStack.pop());
+      redrawCanvas();
+    });
+
+    // Erase all
+    document.getElementById('erase').addEventListener('click', () => {
+      undoStack.length = 0;
+      redoStack.length = 0;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    });
+
+    // Redraw the canvas
+    function redrawCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (const path of undoStack) {
+        ctx.beginPath();
+        for (let i = 0; i < path.length; i++) {
+          const { x, y } = path[i];
+          if (i === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+        }
+        ctx.stroke();
+      }
+    }
+
+    // Resize canvas on window resize
+    window.addEventListener('resize', () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight - 50; // Adjust for controls height
+      redrawCanvas();
+    });
+  </script>
+</body>
+</html>
